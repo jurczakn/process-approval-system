@@ -2,6 +2,7 @@ package com.avalonhcs.approvalsystem.serviceimpl;
 
 import com.avalonhcs.approvalsystem.enums.RequestStatus;
 import com.avalonhcs.approvalsystem.enums.RequestType;
+import com.avalonhcs.approvalsystem.model.Approval;
 import com.avalonhcs.approvalsystem.model.Request;
 import com.avalonhcs.approvalsystem.model.User;
 import com.avalonhcs.approvalsystem.repo.RequestRepo;
@@ -16,6 +17,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
@@ -195,6 +197,120 @@ class RequestServiceImplTest {
         assertEquals(managerApprover, savedRequest.getAssignedTo(), "AssignedTo should be set to the manager approver");
     }
 
+    /*Process a new Approval:
+    When a user Saves an Approval, then process the approval appropriately, save the updated request, and then save the approval.
+    If it is ambiguous, or you are unsure how to arrange your test, or what to assert, go back to requirements gathering.  It does not meet our Definition of Done.
+    	- Details
+		○ Always check that the approver matches the assignedTo in the Request
+			§ Should throw exception in this case
+			§ InvalidArgument Exception
+		○ If request type is expense
+			§ If status is pending fianance approval
+				□ Change status to manager approval
+				□ Set approver to direct supervisor of requester
+			§ If status is manager approval
+				□ Change status to approved
+				□ Set approver to null
+				□ Set approved to true
+			§ If status is anything else
+				□ Throw exception InvalidRequestState exception
+		○ If request type is leave
+			§ If status is pending hr approval
+				□ Change status to manager approval
+				□ Set approver to direct supervisor of requester
+			§ If status is manager approval
+				□ Change status to approved
+				□ Set approver to null
+				□ Set approver to null
+				□ Set approved to true
+			§ If status is anything else
+				□ Throw exception invalidRequestState exception
+		○ If request type is project proposal
+			§ If status is pending manager approval
+				□ Set approver to direct supervisor of approver
+					® If approver does not have a direct supervisor
+						◊ Set status to approved
+						◊ Set approved to null
+						◊ Set approved to true
+				□ Set status to pending department head approval
+			§ If status is pending dept head approval
+				□ Set status to approved
+				□ Set approved to true
+Set approver to null
+
+     */
+    @Test
+    void whenExpenseRequestAndStatusFinanceApproval_ThenSetStatusAndApprover() {
+
+        //arrange
+        Request approvalRequest = new Request();
+        approvalRequest.setRequestType(RequestType.EXPENSE);
+        approvalRequest.setRequestStatus(RequestStatus.PENDING_FINANCE_APPROVAL);
+
+        Approval approval = new Approval();
+
+        User userRequester = new User();
+        userRequester.setId(2);
+        userRequester.setUsername("requester_user");
+        userRequester.setDepartment("Sales");
+        approvalRequest.setRequester(userRequester);
+
+        User managerApprover = new User();
+        managerApprover.setId(1);
+        managerApprover.setUsername("manager_approver");
+        managerApprover.setDepartment("Sales");
+        userRequester.setDirectSupervisor(managerApprover);
+
+        when(requestRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+
+        //act
+        Request processedRequest = requestServiceImpl.processApproval(approvalRequest, approval);
+
+        //assert
+        assertEquals(RequestStatus.PENDING_MANAGER_APPROVAL, processedRequest.getRequestStatus(), "The request status should be updated appropriately");
+        assertEquals(managerApprover, processedRequest.getAssignedTo(), "The assignedTo should be updated to the manager approver");
+        verify(requestRepo).save(any());
+
+
+    }
+
+    @Test
+    void whenExpenseRequestAndStatusManagerApproval_ThenSetStatusAndApprover() {
+
+        //arrange
+        Request approvalRequest = new Request();
+        approvalRequest.setRequestType(RequestType.EXPENSE);
+        approvalRequest.setRequestStatus(RequestStatus.PENDING_MANAGER_APPROVAL);
+
+        Approval approval = new Approval();
+
+        User userRequester = new User();
+        userRequester.setId(2);
+        userRequester.setUsername("requester_user");
+        userRequester.setDepartment("Sales");
+        approvalRequest.setRequester(userRequester);
+
+        User managerApprover = new User();
+        managerApprover.setId(1);
+        managerApprover.setUsername("manager_approver");
+        managerApprover.setDepartment("Sales");
+        userRequester.setDirectSupervisor(managerApprover);
+
+        when(requestRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+
+        //act
+        Request processedRequest = requestServiceImpl.processApproval(approvalRequest, approval);
+
+        //assert
+        assertEquals(RequestStatus.APPROVED, processedRequest.getRequestStatus(), "The request status should be updated appropriately");
+        assertNull(processedRequest.getAssignedTo(), "The assignedTo should be updated to null");
+        assertTrue(processedRequest.isApproved(), "The approved flag should be set to true");
+        verify(requestRepo).save(any());
+
+
+    }
 
 
 }

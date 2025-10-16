@@ -43,6 +43,26 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public Request processApproval(Request request, Approval approval) {
+
+        if (request.getRequestType().equals(RequestType.EXPENSE)) {
+            if (request.getRequestStatus().equals(RequestStatus.PENDING_FINANCE_APPROVAL)) {
+
+                request.setRequestStatus(RequestStatus.PENDING_MANAGER_APPROVAL);
+                request.setAssignedTo(request.getRequester().getDirectSupervisor());
+
+                return requestRepo.save(request);
+
+            } else if (request.getRequestStatus().equals(RequestStatus.PENDING_MANAGER_APPROVAL)) {
+
+                request.setApproved(true);
+                request.setRequestStatus(RequestStatus.APPROVED);
+                request.setAssignedTo(null);
+
+                return requestRepo.save(request);
+
+            }
+        }
+
         return null;
     }
 

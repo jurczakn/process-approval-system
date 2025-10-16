@@ -35,6 +35,7 @@ class UserServiceImplTest {
         //assert
         assertEquals(financeUser1, nextApprover, "The next approver should be the first finance user");
         assertEquals(financeUser2, nextNextApprover, "The next next approver should be the second finance user");
+
     }
 
     @Test
